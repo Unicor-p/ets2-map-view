@@ -1,0 +1,14 @@
+/**
+ * @author:	Emmanuel SMITH <hey@emmanuel-smith.me>
+ * project:	ets2-map-view
+ * file: 	_map-area.scss
+ * Date: 	26/04/2022
+ * Time: 	20:11
+ */
+
+@import "variable";
+
+.map {
+	width: 100vw;
+	height: calc( 100vh - #{$top-bar-height} );
+}
