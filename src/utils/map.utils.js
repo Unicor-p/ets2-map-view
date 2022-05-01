@@ -6,25 +6,25 @@
  * Time: 	21:38
  */
 
-import {
-  betweenFloat,
-  greaterOrEqualThanFloat,
-  lessOrEqualThanFloat,
-  log
-} from '@/utils/app.utils';
+import { log } from '@/utils/app.utils';
 import axios from 'axios';
+import { Feature } from 'ol';
 import { defaults as defaultControls, MousePosition } from 'ol/control';
 import { createStringXY } from 'ol/coordinate';
+import { Point } from 'ol/geom';
 import Tile from 'ol/layer/Tile';
+import VectorLayer from 'ol/layer/Vector';
 import Map from 'ol/Map';
 import Projection from 'ol/proj/Projection';
+import { Vector as VectorSource } from 'ol/source';
 import XYZ from 'ol/source/XYZ';
+import { Icon, Style } from 'ol/style';
 import View from 'ol/View';
 
 let d = {
   map: null,
   playerIcon: null,
-  playerFeature: null,
+  markerFeature: null,
   gBehaviorCenterOnPlayer: true,
   gBehaviorRotateWithPlayer: true,
   gIgnoreViewChangeEvents: false,
@@ -86,7 +86,7 @@ const initMap = () => {
 
   // --- [Debug] Mouse position
   const mousePosition = new MousePosition({
-    coordinateFormat: createStringXY(4),
+    coordinateFormat: createStringXY(3),
     className: 'custom-mouse-position',
     target: document.getElementById('mouse-position'),
     projection
@@ -98,7 +98,7 @@ const initMap = () => {
       zoom: true,
       rotate: false
     }).extend([mousePosition]),
-    layers: [getMapTilesLayer(projection)],
+    layers: [getMapTilesLayer(projection), getMarkerLayer()],
     target: 'map',
     view: new View({
       center: [0, 0],
@@ -139,44 +139,48 @@ const getMapTilesLayer = (projection) => {
 
 // ----
 
-const updatePlayerPositionAndRotation = (lon, lat, rot, speed) => {
+const getMarkerLayer = () => {
+  d.playerIcon = new Icon({
+    anchor: [0.5, 39],
+    anchorXUnits: 'fraction',
+    anchorYUnits: 'pixels',
+    rotateWithView: true,
+    src: 'https://github.com/meatlayer/ets2-mobile-route-advisor/raw/master/img/player_proportions.png'
+  });
+
+  let playerIconStyle = new Style({
+    image: d.playerIcon
+  });
+  d.markerFeature = new Feature({
+    geometry: new Point([d.config.map.maxX / 2, d.config.map.maxY / 2])
+  });
+  // For some reason, we cannot pass the style in the constructor.
+  d.markerFeature.setStyle(playerIconStyle);
+
+  // Adding a layer for features overlaid on the map.
+  let featureSource = new VectorSource({
+    features: [d.markerFeature],
+    wrapX: false
+  });
+  return new VectorLayer({
+    source: featureSource
+  });
+};
+
+const updatePlayerPositionAndRotation = (lon, lat) => {
   if (d.ready !== true) return;
 
   lon = lon.toFixed(3);
   lat = lat.toFixed(3);
-  rot = rot.toFixed(5);
-  speed = speed.toFixed(0);
-
-  if (d.lastPos.x === lon || d.lastPos.y === lat) return;
-
   d.lastPos = {
     x: lon,
     y: lat
   };
 
   let map_coords = gameCoordToPixels(lon, lat);
-  let rad = rot * Math.PI * 2;
 
-  d.playerFeature.getGeometry().setCoordinates(map_coords);
-  d.playerIcon.setRotation(-rad);
-
-  d.gIgnoreViewChangeEvents = true;
-  if (d.gBehaviorCenterOnPlayer) {
-    if (d.gBehaviorRotateWithPlayer) {
-      //auto-zoom map by speed
-      if (lessOrEqualThanFloat(speed, 30)) d.map.getView().setZoom(15);
-      else if (betweenFloat(speed, 30, 50)) d.map.getView().setZoom(9);
-      else if (betweenFloat(speed, 51, 89)) d.map.getView().setZoom(8);
-      else if (greaterOrEqualThanFloat(speed, 90)) d.map.getView().setZoom(7);
-
-      d.map.getView().setCenter(map_coords);
-      d.map.getView().setRotation(rad);
-    } else {
-      d.map.getView().setCenter(map_coords);
-      d.map.getView().setRotation(0);
-    }
-  }
-  d.gIgnoreViewChangeEvents = false;
+  d.markerFeature.getGeometry().setCoordinates(map_coords);
+  d.map.getView().setCenter(map_coords);
 };
 
 const gameCoordToPixels = (x, y) => {
